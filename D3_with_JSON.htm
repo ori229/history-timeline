@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>D3.js Timeline Tag Cloud</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; overflow: hidden; background: #fff; }
+        .axis text { font-size: 14px; fill: #555; }
+        .axis path, .axis line { stroke: #ccc; }
+        .event-text { cursor: pointer; transition: opacity 0.2s; }
+        .event-text:hover { fill: #000 !important; font-weight: bold; }
+#tooltip {
+    position: absolute;
+    z-index: 9999;          /* High number to ensure it stays on top */
+    pointer-events: none;   /* VERY IMPORTANT: mouse goes "through" tooltip */
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    border-radius: 4px;
+    opacity: 0;             /* Hidden by default */
+    font-size: 14px;
+    direction: rtl;         /* Ensure Hebrew text looks right */
+}
+#timeline-container {
+    width: 90%;         /* 90% of page width */
+    height: 80vh;        /* 80% of the viewport height */
+    margin: 0 auto;      /* Center it */
+    position: relative;
+    border: 1px solid #ccc;
+}
+
+#timeline {
+    width: 100%;
+    height: 100%;
+    display: block;      /* Removes extra whitespace at bottom */
+}
+.after-text {
+}
+    </style>
+</head>
+<body dir=rtl>
+ממוקם לפי תאריך התחלה.
+<BR>
+אולי עדיף למקם לפי האמצע - בין תחילת האירוע לסופו.
+<div id="tooltip"></div>
+<div id="timeline-container">
+    <svg id="timeline"></svg>
+</div>
+<div class="after-text">
+    Try to zoom
+</div>
+<script>
+// 1. Your Sample Data
+const rawData = [
+  {
+    "hebrew_article": "מרד בר כוכבא",
+    "start_date": "0132-01-01",
+    "end_date": "0136-01-01",
+    "english_article": "Bar Kokhba revolt",
+    "english_pageviews_2025": 8355
+  },
+  {
+    "hebrew_article": "גירוש ספרד",
+    "start_date": "1492-01-01",
+    "end_date": "1492-01-01",
+    "english_article": "Expulsion of Jews from Spain",
+    "english_pageviews_2025": 3679
+  },
+  {
+    "hebrew_article": "השואה",
+    "start_date": "1933-01-01",
+    "end_date": "1945-01-01",
+    "english_article": "The Holocaust",
+    "english_pageviews_2025": 143438
+  },
+  {
+    "hebrew_article": "מלחמת ששת הימים",
+    "start_date": "1967-06-05",
+    "end_date": "1967-06-10",
+    "english_article": "Six-Day War",
+    "english_pageviews_2025": 33663
+  },
+  {
+    "hebrew_article": "מלחמת יום הכיפורים",
+    "start_date": "1973-10-06",
+    "end_date": "1973-10-26",
+    "english_article": "Yom Kippur War",
+    "english_pageviews_2025": 33994
+  },
+  {
+    "hebrew_article": "העלייה הראשונה",
+    "start_date": "1881-01-01",
+    "end_date": "1903-01-01",
+    "english_article": "First Aliyah",
+    "english_pageviews_2025": 1696
+  },
+  {
+    "hebrew_article": "העלייה השנייה",
+    "start_date": "1904-01-01",
+    "end_date": "1914-01-01",
+    "english_article": "Second Aliyah",
+    "english_pageviews_2025": 858
+  },
+  {
+    "hebrew_article": "העלייה השלישית",
+    "start_date": "1919-01-01",
+    "end_date": "1923-01-01",
+    "english_article": "Third Aliyah",
+    "english_pageviews_2025": 595
+  },
+  {
+    "hebrew_article": "העלייה הרביעית",
+    "start_date": "1924-01-01",
+    "end_date": "1928-01-01",
+    "english_article": "Fourth Aliyah",
+    "english_pageviews_2025": 310
+  },
+  {
+    "hebrew_article": "העלייה החמישית",
+    "start_date": "1929-01-01",
+    "end_date": "1939-01-01",
+    "english_article": "Fifth Aliyah",
+    "english_pageviews_2025": 370
+  },
+  {
+    "hebrew_article": "המצור על ירושלים (70)",
+    "start_date": "0070-02-01",
+    "end_date": "0070-09-08",
+    "english_article": "Siege of Jerusalem (70 CE)",
+    "english_pageviews_2025": 10523
+  }
+];
+
+
+// 2. Setup Dimensions (90% width/height)
+const container = d3.select("#timeline-container").node();
+const width = container.getBoundingClientRect().width;
+const height = container.getBoundingClientRect().height;
+const margin = { top: 50, right: 80, bottom: 80, left: 80 };
+
+const svg = d3.select("#timeline")
+    .attr("width", width)
+    .attr("height", height);
+
+// 3. Process Data
+const data = rawData.map(d => ({
+    name: d.hebrew_article,
+    date: new Date(d.start_date),
+    views: d.english_pageviews_2025,
+    url: `https://he.wikipedia.org/wiki/${encodeURIComponent(d.hebrew_article)}`
+}));
+
+// 4. Scales
+// Right-to-Left scale
+const xScale = d3.scaleTime()
+    .domain(d3.extent(data, d => d.date))
+    .range([width - margin.right, margin.left]);
+
+const sizeScale = d3.scaleSqrt()
+    .domain([d3.min(data, d => d.views), d3.max(data, d => d.views)])
+    .range([14, 48]); // Font size range
+
+// 5. Force Simulation (Initial Placement)
+const simulation = d3.forceSimulation(data)
+    .force("x", d3.forceX(d => xScale(d.date)).strength(1))
+    .force("y", d3.forceY(height / 2).strength(0.1))
+    .force("collide", d3.forceCollide().radius(d => sizeScale(d.views) * 0.7))
+    .stop();
+
+for (let i = 0; i < 120; i++) simulation.tick();
+
+// 6. Draw Axis
+const xAxis = d3.axisBottom(xScale).ticks(10);
+const gAxis = svg.append("g")
+    .attr("class", "axis")
+    .attr("transform", `translate(0, ${height - margin.bottom})`)
+    .call(xAxis);
+
+// 7. Draw Labels
+const labels = svg.selectAll(".event-text")
+    .data(data)
+    .enter()
+    .append("text")
+    .attr("class", "event-text")
+    .attr("x", d => d.x)
+    .attr("y", d => d.y)
+    .attr("text-anchor", "middle")
+    .style("font-size", d => sizeScale(d.views) + "px")
+    .style("fill", d => d3.interpolateWarm(0.2 + (d.views / d3.max(data, d => d.views)) * 0.8))
+    .style("cursor", "pointer")
+    .text(d => d.name)
+    .on("click", (event, d) => window.open(d.url, '_blank'))
+    .on("mouseover", (event, d) => {
+        d3.select(event.currentTarget).raise().style("fill", "black");
+        d3.select("#tooltip")
+            .style("opacity", 1)
+            .html(`<strong>${d.name}</strong><br>צפיות: ${d.views.toLocaleString()}`)
+            .style("left", (event.pageX + 15) + "px")
+            .style("top", (event.pageY - 15) + "px");
+    })
+    .on("mouseout", (event, d) => {
+        d3.select(event.currentTarget).style("fill", d3.interpolateWarm(0.2 + (d.views / d3.max(data, d => d.views)) * 0.8));
+        d3.select("#tooltip").style("opacity", 0);
+    });
+
+// 8. Zoom Behavior
+const zoom = d3.zoom()
+    .scaleExtent([0.5, 500]) // High zoom range for huge time spans
+    .on("zoom", (event) => {
+        const newXScale = event.transform.rescaleX(xScale);
+        gAxis.call(d3.axisBottom(newXScale));
+        labels.attr("x", d => newXScale(d.date));
+    });
+
+svg.call(zoom);
+	
+</script>
+</body>
+</html>

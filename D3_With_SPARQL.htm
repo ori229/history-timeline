@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>D3.js Timeline Tag Cloud</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; overflow: hidden; background: #fff; }
+        .axis text { font-size: 14px; fill: #555; }
+        .axis path, .axis line { stroke: #ccc; }
+        .event-text { cursor: pointer; transition: opacity 0.2s; }
+        .event-text:hover { fill: #000 !important; font-weight: bold; }
+#tooltip {
+    position: absolute;
+    z-index: 9999;          /* High number to ensure it stays on top */
+    pointer-events: none;   /* VERY IMPORTANT: mouse goes "through" tooltip */
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    border-radius: 4px;
+    opacity: 0;             /* Hidden by default */
+    font-size: 14px;
+    direction: rtl;         /* Ensure Hebrew text looks right */
+}
+#timeline-container {
+    width: 90%;         /* 90% of page width */
+    height: 80vh;        /* 80% of the viewport height */
+    margin: 0 auto;      /* Center it */
+    position: relative;
+    border: 1px solid #ccc;
+}
+
+#timeline {
+    width: 100%;
+    height: 100%;
+    display: block;      /* Removes extra whitespace at bottom */
+}
+.after-text {
+}
+    </style>
+</head>
+<body dir=rtl>
+ממוקם לפי תאריך התחלה.
+<BR>
+אולי עדיף למקם לפי האמצע - בין תחילת האירוע לסופו.
+<div id="tooltip"></div>
+<div id="timeline-container">
+    <svg id="timeline"></svg>
+</div>
+<div class="after-text">
+    Try to zoom
+</div>
+<script>
+const container = d3.select("#timeline-container").node();
+const width = container.getBoundingClientRect().width;
+const height = container.getBoundingClientRect().height;
+const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+
+// Use these width/height variables for your scales and SVG
+const svg = d3.select("#timeline")
+    .attr("width", width)
+    .attr("height", height);
+
+
+
+    const query = `
+SELECT ?item ?itemLabel ?start ?sitelinks ?article WHERE {
+  ?item wdt:P361*/wdt:P279* wd:Q8669 .
+  ?item wdt:P580 ?start .
+  FILTER(YEAR(?start) >= 1900 && YEAR(?start) <= 2025)
+  ?item rdfs:label ?itemLabel .
+  FILTER(LANG(?itemLabel) = "he")
+  ?item wikibase:sitelinks ?sitelinks .
+
+  # Add this block to get the Hebrew Wikipedia URL
+  ?article schema:about ?item ;
+           schema:isPartOf <https://he.wikipedia.org/> .
+} ORDER BY DESC(?sitelinks) LIMIT 3000
+`;
+
+    async function init() {
+        const url = "https://query.wikidata.org/sparql?query=" + encodeURIComponent(query);
+        const response = await fetch(url, { headers: { 'Accept': 'application/sparql-results+json' } });
+        const json = await response.json();
+        
+		const data = json.results.bindings.map(d => ({
+			name: d.itemLabel.value,
+			date: new Date(d.start.value),
+			links: +d.sitelinks.value,
+			url: d.article.value // Add this line
+		}));
+
+// Define the zoom behavior
+const zoom = d3.zoom()
+    .scaleExtent([1, 40])
+    .on("zoom", (event) => {
+        const transform = event.transform;
+        const newXScale = transform.rescaleX(xScale); // This works automatically with reversed ranges!
+
+        svg.select(".axis").call(d3.axisBottom(newXScale));
+        labels.attr("x", d => newXScale(d.date));
+    });
+
+// Apply the zoom behavior to the SVG
+svg.call(zoom);
+
+        // 1. Scales
+		const xScale = d3.scaleTime()
+			.domain(d3.extent(data, d => d.date))
+			.range([width - margin.right, margin.left]); // Swapped: Right side is start, Left side is end
+
+        const sizeScale = d3.scaleSqrt()
+            .domain([d3.min(data, d => d.links), d3.max(data, d => d.links)])
+            .range([10, 42]); // Font size range (min 10px, max 42px)
+
+        // 2. Axis
+svg.append("g")
+    .attr("transform", `translate(0,${height - margin.bottom})`)
+    .attr("class", "axis")
+    .call(d3.axisBottom(xScale).ticks(10))
+    .selectAll("text")
+    .style("text-anchor", "middle");
+
+        // 3. Force Simulation (The "Tag Cloud" Logic)
+        // We fix the X position to the date, but let Y float to avoid overlap
+        const simulation = d3.forceSimulation(data)
+            .force("x", d3.forceX(d => xScale(d.date)).strength(1))
+            .force("y", d3.forceY(height / 2).strength(0.05))
+            .force("collide", d3.forceCollide().radius(d => sizeScale(d.links) * 0.7))
+            .stop();
+
+        // Run simulation manually for a few ticks to settle positions
+        for (let i = 0; i < 120; i++) simulation.tick();
+
+        // 4. Draw Labels
+		const labels = svg.selectAll(".event-text")
+			.data(data)
+			.enter()
+			.append("text")
+			.attr("class", "event-text")
+            .attr("x", d => d.x)
+            .attr("y", d => d.y)
+            .attr("text-anchor", "middle")
+            .style("font-size", d => sizeScale(d.links) + "px")
+            .style("fill", d => d3.interpolateBlues(d.links / 100 + 0.3))
+			.style("cursor", "pointer") // Visual cue that it's a link
+			.on("click", (event, d) => {
+				window.open(d.url, '_blank'); // Opens the Wikipedia article in a new tab
+			})
+            .text(d => d.name)
+            .on("mouseover", (event, d) => {
+                d3.select("#tooltip")
+                    .style("opacity", 1)
+                    .html(`<strong>${d.name}</strong><br>תאריך: ${d.date.toLocaleDateString('he-IL')}<br>קישורים: ${d.links}`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            })
+            .on("mouseout", () => d3.select("#tooltip").style("opacity", 0));
+			
+			//svg.call(zoom.transform, d3.zoomIdentity.scale(2).translate(-xScale(new Date(1967, 0, 1)) + width/4, 0));
+    }
+
+    init();
+	
+</script>
+</body>
+</html>
