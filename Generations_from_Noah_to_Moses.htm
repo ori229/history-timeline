@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ציר זמן דורות המקרא</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .cursor-help { cursor: help; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+        // Mocking Lucide icons since we're using CDN
+        const ArrowDown = () => <span style={{fontSize:'16px'}}>↓</span>;
+        const Info = () => <span style={{fontSize:'16px'}}>ℹ</span>;
+        const BookOpen = () => <span style={{fontSize:'16px'}}>📖</span>;
+        const User = () => <span style={{fontSize:'16px'}}>👤</span>;
+
+        const GenerationsTimeline = () => {
+            const data = [
+                { name: "נח", birth: 1056, death: 2006, lifespan: 950, color: "#1e3a8a", verse: "וַיְהִי כָּל יְמֵי נֹחַ תְּשַׁע מֵאוֹת שָׁנָה וַחֲמִשִּׁים שָׁנָה וַיָּמֹת. (בראשית ט, כט)" },
+                { name: "שם", birth: 1558, death: 2158, lifespan: 600, color: "#1e3a8a", verse: "וַיְחִי שֵׁם אַחֲרֵי הוֹלִידוֹ אֶת אַרְפַּכְשָׁד חֲמֵשׁ מֵאוֹת שָׁנָה... (בראשית יא, יא)" },
+                { name: "ארפכשד", birth: 1658, death: 2096, lifespan: 438, color: "#1e3a8a", verse: "וַיְחִי אַרְפַּכְשַׁד אַחֲרֵי הוֹלִידוֹ אֶת שֶׁלַח אַרְבַּע מֵאוֹת שָׁנָה וּשְׁלֹשׁ שָׁנָה... (בראשית יא, יג)" },
+                { name: "שלח", birth: 1693, death: 2126, lifespan: 433, color: "#1e3a8a", verse: "וַיְחִי שֶׁלַח אַחֲרֵי הוֹלִידוֹ אֶת עֵבֶר אַרְבַּע מֵאוֹת שָׁנָה וּשְׁלֹשׁ שָׁנָה... (בראשית יא, טו)" },
+                { name: "עבר", birth: 1723, death: 2187, lifespan: 464, color: "#1e3a8a", verse: "וַיְחִי עֵבֶר אַחֲרֵי הוֹלִידוֹ אֶת פֶּלֶג אַרְבַּע מֵאוֹת שָׁנָה וּשְׁלֹשִׁים שָׁנָה... (בראשית יא, יז)" },
+                { name: "פלג", birth: 1757, death: 1996, lifespan: 239, color: "#1e3a8a", verse: "וַיְחִי פֶלֶג אַחֲרֵי הוֹלִידוֹ אֶת רְעוּ מָאתַיִם שָׁנָה וָתֵשַׁע שָׁנִים... (בראשית יא, יט)" },
+                { name: "רעו", birth: 1787, death: 2026, lifespan: 239, color: "#1e3a8a", verse: "וַיְחִי רְעוּ אַחֲרֵי הוֹלִידוֹ אֶת שְׂרוּג מָאתַיִם שָׁנָה וְשֶׁבַע שָׁנִים... (בראשית יא, כא)" },
+                { name: "שרוג", birth: 1819, death: 2049, lifespan: 230, color: "#1e3a8a", verse: "וַיְחִי שְׂרוּג אַחֲרֵי הוֹלִידוֹ אֶת נָחוֹר מָאתַיִם שָׁנָה... (בראשית יא, כג)" },
+                { name: "נחור", birth: 1849, death: 1997, lifespan: 148, color: "#1e3a8a", verse: "וַיְחִי נָחוֹר אַחֲרֵי הוֹלִידוֹ אֶת תֶּרַח תְּשַׁע עֶשְׂרֵה שָׁנָה וּמְאַת שָׁנָה... (בראשית יא, כה)" },
+                { name: "תרח", birth: 1878, death: 2083, lifespan: 205, color: "#1e3a8a", verse: "וַיִּהְיוּ יְמֵי תֶרַח חָמֵשׁ שָׁנִים וּמָאתַיִם שָׁנָה וַיָּמָת תֶּרַח בְּחָרָן. (בראשית יא, לב)" },
+                { name: "אברהם", birth: 1948, death: 2123, lifespan: 175, color: "#1e3a8a", verse: "וְאֵלֶּה יְמֵי שְׁנֵי חַיֵּי אַבְרָהָם אֲשֶׁר חָי מְאַת שָׁנָה וְשִׁבְעִים שָׁנָה וְחָמֵשׁ שָׁנִים. (בראשית כה, ז)" },
+                { name: "יצחק", birth: 2048, death: 2228, lifespan: 180, color: "#1e3a8a", verse: "וַיִּהְיוּ יְמֵי יִצְחָק מְאַת שָׁנָה וּשְׁמֹנִים שָׁנָה. (בראשית לה, כח)" },
+                { name: "יעקב", birth: 2108, death: 2255, lifespan: 147, color: "#1e3a8a", verse: "וַיְהִי יְמֵי יַעֲקֹב שְׁנֵי חַיָּיו שֶׁבַע שָׁנִים וְאַרְבָּעִים וּמְאַת שָׁנָה. (בראשית מז, כח)" },
+                { name: "לוי", birth: 2195, death: 2332, lifespan: 137, color: "#1e3a8a", verse: "וּשְׁנֵי חַיֵּי לֵוִי שֶׁבַע וּשְׁלֹשִׁים וּמְאַת שָׁנָה. (שמות ו, טז)" },
+                { name: "קהת", birth: 2255, death: 2388, lifespan: 133, color: "#1e3a8a", verse: "וּשְׁנֵי חַיֵּי קְהָת שָׁלֹשׁ וּשְׁלֹשִׁים וּמְאַת שָׁנָה. (שמות ו, יח)" },
+                { name: "עמרם", birth: 2320, death: 2457, lifespan: 137, color: "#1e3a8a", verse: "וּשְׁנֵי חַיֵּי עַמְרָם שֶׁבַע וּשְׁלֹשִׁים וּמְאַת שָׁנָה. (שמות ו, כ)" },
+                { name: "משה", birth: 2368, death: 2488, lifespan: 120, color: "#1e3a8a", verse: "וּמֹשֶׁה בֶּן מֵאָה וְעֶשְׂרִים שָׁנָה בְּמֹתוֹ לֹא כָהֲתָה עֵינוֹ וְלֹא נָס לֵחֹה. (דברים לד, ז)" }
+            ];
+
+            const minYear = 1000;
+            const maxYear = 2550;
+            const totalRange = maxYear - minYear;
+            const [hovered, setHovered] = useState(null);
+
+            return (
+                <div className="flex flex-col items-center p-4 md:p-6 bg-slate-50 min-h-screen font-sans">
+                    <div className="max-w-6xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+                        <div className="bg-slate-900 text-white p-5 text-center">
+                            <h1 className="text-2xl font-bold mb-1">מנח ועד משה: שרשרת הדורות</h1>
+                            <p className="text-slate-400 text-sm italic">העבירו את העכבר על הברים כדי לראות את הפסוק המקור</p>
+                        </div>
+
+                        <div className="p-4 overflow-x-auto">
+                            <div className="relative min-w-[1000px] mt-6 mb-16 px-4">
+                                <div className="absolute top-0 left-0 w-full h-full border-r border-slate-100 flex justify-between pointer-events-none">
+                                    {[1000, 1250, 1500, 1750, 2000, 2250, 2500].map(year => (
+                                        <div key={year} className="relative flex flex-col items-center h-full">
+                                            <div className="h-full border-l border-slate-200 border-dashed"></div>
+                                            <span className="absolute -bottom-8 text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded shadow-sm border border-slate-100">
+                                                {year}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex flex-col gap-1 relative z-10 py-2">
+                                    {data.map((person, idx) => {
+                                        const startPos = ((person.birth - minYear) / totalRange) * 100;
+                                        const width = (person.lifespan / totalRange) * 100;
+                                        return (
+                                            <div key={idx} className="group flex items-center h-7 relative" onMouseEnter={() => setHovered(idx)} onMouseLeave={() => setHovered(null)}>
+                                                <div className="w-24 flex-shrink-0 text-right ml-4">
+                                                    <span className="font-bold text-sm text-slate-700">{person.name}</span>
+                                                </div>
+                                                <div className="flex-grow h-5 bg-slate-50 rounded-sm relative flex items-center">
+                                                    <div className="absolute h-full rounded-sm transition-all duration-300 ease-out flex items-center justify-center text-[9px] text-white font-bold shadow-sm z-20 overflow-hidden cursor-help"
+                                                         style={{ right: `${startPos}%`, width: `${width}%`, backgroundColor: person.color, opacity: hovered === null || hovered === idx ? 1 : 0.6, transform: hovered === idx ? 'scaleY(1.3)' : 'scaleY(1)' }}>
+                                                        <span className="whitespace-nowrap px-1">{person.birth} - {person.death}</span>
+                                                    </div>
+                                                    {hovered === idx && (
+                                                        <div className="absolute z-50 bg-slate-800 text-white p-3 rounded-lg shadow-2xl text-[12px] w-72 text-center pointer-events-none"
+                                                             style={{ right: `${Math.min(Math.max(startPos + (width/2) - 15, 0), 70)}%`, top: '-55px', transform: 'translateX(50%)' }}>
+                                                            <div className="flex items-center gap-1 mb-1 justify-center border-b border-slate-600 pb-1">
+                                                                <BookOpen />
+                                                                <span className="font-bold mr-1">{person.name}</span>
+                                                            </div>
+                                                            <p className="leading-relaxed italic">{person.verse}</p>
+                                                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-800 rotate-45"></div>
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute text-[9px] font-bold text-slate-400" style={{ right: `${startPos + width + 1}%` }}>
+                                                        {person.lifespan} ש'
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 border-t border-slate-200 p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-white p-3 rounded-lg border-r-4 border-r-blue-700 shadow-sm">
+                                <h3 className="font-bold text-sm flex items-center gap-2 text-blue-800 mb-1"><ArrowDown /> התקצרות החיים</h3>
+                                <p className="text-[12px] text-slate-600">ניתן לראות את הירידה התלולה באורך החיים מהמבול ועד יציאת מצרים.</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg border-r-4 border-r-amber-500 shadow-sm">
+                                <h3 className="font-bold text-sm flex items-center gap-2 text-amber-600 mb-1"><Info /> מקור המידע</h3>
+                                <p className="text-[12px] text-slate-600">הנתונים מבוססים על ספר בראשית וספר שמות. הפסוקים מופיעים במעבר עכבר.</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg border-r-4 border-r-slate-800 shadow-sm">
+                                <h3 className="font-bold text-sm flex items-center gap-2 text-slate-800 mb-1"><User /> משה רבנו</h3>
+                                <p className="text-[12px] text-slate-600">משה חי 120 שנה. בתרשים זה הוא מופיע באותו סגנון עיצובי של שאר הדורות.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GenerationsTimeline />);
+    </script>
+</body>
+</html>
